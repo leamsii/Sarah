@@ -15,15 +15,24 @@ class API:
 		self.engine.setProperty('voice', 'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Speech\\Voices\\Tokens\\TTS_MS_EN-US_ZIRA_11.0')
 		self.engine.setProperty('rate', 155)
 		self.engine.setProperty('volume', 1)
-		self.connect_limit = 5
+		self.base_url = 'http://orteil.dashnet.org/cookieclicker/'
 
 		with requests.session() as s:
 			#self.speak('Good morning, connecting to server.')
 			while True:
-				self.connect_server(s)
-			else:
-				self.speak("I was unable to connect to the server.")
+				try:
+					self.speak("Main program here.")
+					response = s.get(self.base_url, timeout=5)
+					time.sleep(1)
 
+				except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError):
+					self.speak("Sir, I was disconnected from the server, trying to re-connect")
+					self.connect_server(s)
+
+				except Exception as e:
+					self.speak("Unknown error, look at the logs.")
+					print(e)
+					exit()
 
 	def speak(self, msg):
 		self.engine.say(msg)
@@ -49,13 +58,27 @@ class API:
 		return msg
 
 	def connect_server(self, s):
-		if self.connect_limit <= 0:
-			self.speak("I could not re-connect to the server, ending session.")
-			exit()
-		try:
-			response = s.get('http://orteil.dashnet.org/cookieclicker/', timeout=1)
+		# This will handle disconnects and re-connects
+		for _ in range(10):
+			try:
+				response = s.get(self.base_url, timeout=1)
+				self.speak("Re-connected to server")
+				break
 
-			self.speak("New ticket")
+			except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError):
+				print(f"Error: Disconnected, connection attempts left: {_}")
+				time.sleep(3)
+		else:
+			self.speak("Could not establish a connection, ending session")
+			exit()
+
+
+if __name__ == '__main__':
+	API()
+
+
+"""
+self.speak("New ticket")
 			self.speak("Monitor is black")
 
 			#Simulate a ticket
@@ -65,16 +88,4 @@ class API:
 				self.speak(location)
 
 			self.connect_limit = 5
-			exit()
-
-		# If the connection failed
-		except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError):
-			if self.connect_limit == 5:
-				self.speak("I was disconnected from the server, trying to re-connect.")
-
-			print(f"Error: Disconnected, connection attempts left: {self.connect_limit}")
-			self.connect_limit -= 1
-			time.sleep(3)
-
-if __name__ == '__main__':
-	API()
+"""
