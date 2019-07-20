@@ -7,6 +7,26 @@ import requests
 import time
 
 
+class Remedy:
+	def __init__(self):
+		self.towers = {
+			'WT' : 'West Tower',
+			'ET' : 'East Tower'
+		}
+
+	def get_asset_info(self, asset_name):
+		asset_name = asset_name.strip() # Remove any spaces
+		if len(asset_name) != 15:
+			return None
+
+		tower = self.towers[asset_name[1 : 3]]
+		floor = str(int(asset_name[4 : 6]))
+		is_cart = 'CWM' in asset_name
+
+		msg = f"Located at {tower} {floor}"
+		msg += "...This is a cart" if is_cart else "...This is a PC"
+		return msg
+
 class API:
 	def __init__(self):
 		self.engine = pyttsx3.init()
@@ -17,12 +37,25 @@ class API:
 		self.engine.setProperty('volume', 1)
 		self.base_url = 'http://orteil.dashnet.org/cookieclicker/'
 
+		# Create a Remedy object
+		self.remedy = Remedy()
+
 		with requests.session() as s:
-			#self.speak('Good morning, connecting to server.')
+			self.speak("Searching tickets..")
 			while True:
 				try:
-					self.speak("Main program here.")
-					response = s.get(self.base_url, timeout=5)
+					print("Main program")
+
+					# Simulate new ticket
+					ticket_location = self.remedy.get_asset_info(f'BWTB0900511CWM')
+					if ticket_location:
+						self.speak("New Ticket..." + ticket_location)
+
+					# The summary
+					self.speak("New ticket...User complaint the mouse is not working.")
+
+					# Test data
+					response = s.get(self.base_url)
 					time.sleep(1)
 
 				except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError):
@@ -37,25 +70,6 @@ class API:
 	def speak(self, msg):
 		self.engine.say(msg)
 		self.engine.runAndWait()
-
-	def get_location(self, asset_name):
-		asset_name = asset_name.strip()
-		if len(asset_name) != 15:
-			return None
-
-		towers = {
-			'WT' : 'West Tower',
-			'ET' : 'East Tower'
-		}
-
-		tower = towers[asset_name[1 : 3]]
-		floor = str(int(asset_name[4 : 6]))
-		is_cart = 'CWM' in asset_name
-
-		msg = f"{tower} {floor}"
-		msg += "...This is a cart" if is_cart else "...This is a PC"
-
-		return msg
 
 	def connect_server(self, s):
 		# This will handle disconnects and re-connects
@@ -75,17 +89,3 @@ class API:
 
 if __name__ == '__main__':
 	API()
-
-
-"""
-self.speak("New ticket")
-			self.speak("Monitor is black")
-
-			#Simulate a ticket
-			asset_name = 'BWTB0300511CWMP'
-			location = self.get_location(asset_name)
-			if location:
-				self.speak(location)
-
-			self.connect_limit = 5
-"""
