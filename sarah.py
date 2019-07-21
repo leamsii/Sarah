@@ -13,6 +13,10 @@ class Asset:
 		self.floor = floor
 		self.is_cart = is_cart
 
+class Ticket:
+	def __init__(self, summary, asset = None):
+		self.asset = asset
+		self.summary = summary
 
 class Remedy:
 	def __init__(self):
@@ -68,6 +72,10 @@ class API:
 					print(e)
 					exit()
 
+	def speak(self, msg):
+		self.engine.say(msg)
+		self.engine.runAndWait()
+
 	def update_ticket_list(self, resp):
 
 		"""
@@ -79,24 +87,19 @@ class API:
 		"""
 
 		# Simulate new ticket
-		summary = "The computer won't turn on."
-		asset = self.remedy.get_asset_info(f'BWTB0900511CWMP')
-
-		if asset:
-			cart_msg = "...This is a cart" if asset.is_cart else "...This is a PC"
-			self.speak(f"New ticket...Located at {asset.tower} {asset.floor}{cart_msg}...User says {summary}")
+		return
+		new_ticket = Ticket("The computer won't turn on.", self.remedy.get_asset_info(f'BWTB0900511CWP'))
+		if new_ticket.asset:
+			cart_msg = "...This is a cart" if new_ticket.asset.is_cart else "...This is a PC"
+			self.speak(f"New ticket...Located at {new_ticket.asset.tower} {new_ticket.asset.floor}{cart_msg}...User says {new_ticket.summary}")
 		else:
-			self.speak(f"New ticket...User says {summary}")
-
-	def speak(self, msg):
-		self.engine.say(msg)
-		self.engine.runAndWait()
+			self.speak(f"New ticket...User says {new_ticket.summary}")
 
 	def connect_server(self, s):
 		# This will handle disconnects and re-connects
 		for _ in range(10):
 			try:
-				response = s.get(self.remedy.base_url, timeout=1)
+				response = s.get(self.remedy.base_url)
 				self.speak("Re-connected to server")
 				break
 
