@@ -13,12 +13,8 @@ class Remedy:
 			'WT' : 'West Tower',
 			'ET' : 'East Tower'
 		}
-
-		# Get the cookies
+		# Get the session id cookie here
 		self.base_url = 'http://orteil.dashnet.org/cookieclicker/'
-		with requests.session() as s:
-			resp = s.get(self.base_url)
-			self.cookies = resp.cookies['SESSIONID'] # Or so
 
 
 	def get_asset_info(self, asset_name):
@@ -31,7 +27,7 @@ class Remedy:
 		is_cart = 'CWM' in asset_name
 
 		msg = f"Located at {tower} {floor}"
-		msg += "...This is a cart" if is_cart else "...This is a PC"
+		msg += "...This is a cart..." if is_cart else "...This is a PC..."
 		return msg
 
 class API:
@@ -50,7 +46,7 @@ class API:
 		self.remedy = Remedy()
 
 		with requests.session() as s:
-			self.speak("Searching tickets..")
+			self.speak("Searching tickets")
 			while True:
 				try:
 					print("Main program")
@@ -76,14 +72,16 @@ class API:
 		After, we get the summary and ticket location
 		If our array for the day is empty, skip the first batch
 		"""
-
+		msg = "New ticket..."
 		# Simulate new ticket
-		ticket_location = self.remedy.get_asset_info(f'BWTB0900511CWM')
+		ticket_location = self.remedy.get_asset_info(f'BWTB0900511CWMP')
 		if ticket_location:
-			self.speak("New Ticket..." + ticket_location)
+			msg += ticket_location
 
 		# The summary
-		self.speak("New ticket...User complaint the mouse is not working.")
+		msg += "Computer won't turn on"
+
+		self.speak(msg)
 
 
 	def speak(self, msg):
