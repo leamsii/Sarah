@@ -7,6 +7,13 @@ import requests
 import time
 
 
+class Asset:
+	def __init__(self, tower, floor, is_cart):
+		self.tower = tower
+		self.floor = floor
+		self.is_cart = is_cart
+
+
 class Remedy:
 	def __init__(self):
 		self.towers = {
@@ -26,9 +33,7 @@ class Remedy:
 		floor = str(int(asset_name[4 : 6]))
 		is_cart = 'CWM' in asset_name
 
-		msg = f"Located at {tower} {floor}"
-		msg += "...This is a cart..." if is_cart else "...This is a PC..."
-		return msg
+		return Asset(tower, floor, is_cart)
 
 class API:
 	def __init__(self):
@@ -59,7 +64,7 @@ class API:
 					self.connect_server(s)
 
 				except Exception as e:
-					self.speak("Unknown error, look at the logs.")
+					self.speak("Unknown error, look at the logs for details.")
 					print(e)
 					exit()
 
@@ -72,17 +77,16 @@ class API:
 		After, we get the summary and ticket location
 		If our array for the day is empty, skip the first batch
 		"""
-		msg = "New ticket..."
+
 		# Simulate new ticket
-		ticket_location = self.remedy.get_asset_info(f'BWTB0900511CWMP')
-		if ticket_location:
-			msg += ticket_location
+		summary = "The computer won't turn on."
+		asset = self.remedy.get_asset_info(f'BWTB0900511CWMP')
 
-		# The summary
-		msg += "Computer won't turn on"
-
-		self.speak(msg)
-
+		if asset:
+			cart_msg = "...This is a cart" if asset.is_cart else "...This is a PC"
+			self.speak(f"New ticket...Located at {asset.tower} {asset.floor}{cart_msg}...User says {summary}")
+		else:
+			self.speak(f"New ticket...User says {summary}")
 
 	def speak(self, msg):
 		self.engine.say(msg)
