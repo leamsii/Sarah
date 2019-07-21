@@ -14,6 +14,13 @@ class Remedy:
 			'ET' : 'East Tower'
 		}
 
+		# Get the cookies
+		self.base_url = 'http://orteil.dashnet.org/cookieclicker/'
+		with requests.session() as s:
+			resp = s.get(self.base_url)
+			self.cookies = resp.cookies['SESSIONID'] # Or so
+
+
 	def get_asset_info(self, asset_name):
 		asset_name = asset_name.strip() # Remove any spaces
 		if len(asset_name) != 15:
@@ -35,7 +42,9 @@ class API:
 		self.engine.setProperty('voice', 'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Speech\\Voices\\Tokens\\TTS_MS_EN-US_ZIRA_11.0')
 		self.engine.setProperty('rate', 155)
 		self.engine.setProperty('volume', 1)
-		self.base_url = 'http://orteil.dashnet.org/cookieclicker/'
+		
+		# Keep track of tickets
+		self.tickets = []
 
 		# Create a Remedy object
 		self.remedy = Remedy()
@@ -45,17 +54,8 @@ class API:
 			while True:
 				try:
 					print("Main program")
-
-					# Simulate new ticket
-					ticket_location = self.remedy.get_asset_info(f'BWTB0900511CWM')
-					if ticket_location:
-						self.speak("New Ticket..." + ticket_location)
-
-					# The summary
-					self.speak("New ticket...User complaint the mouse is not working.")
-
-					# Test data
-					response = s.get(self.base_url)
+					response = s.get(self.remedy.base_url) # Simulate getting ticket data
+					self.update_ticket_list(response.text)
 					time.sleep(1)
 
 				except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError):
@@ -67,6 +67,25 @@ class API:
 					print(e)
 					exit()
 
+	def update_ticket_list(self, resp):
+
+		"""
+		In this function we will check if we have any new tickets
+		First by comparing the length of our current ticket array
+		Then checking if the IDS don't match
+		After, we get the summary and ticket location
+		If our array for the day is empty, skip the first batch
+		"""
+
+		# Simulate new ticket
+		ticket_location = self.remedy.get_asset_info(f'BWTB0900511CWM')
+		if ticket_location:
+			self.speak("New Ticket..." + ticket_location)
+
+		# The summary
+		self.speak("New ticket...User complaint the mouse is not working.")
+
+
 	def speak(self, msg):
 		self.engine.say(msg)
 		self.engine.runAndWait()
@@ -75,7 +94,7 @@ class API:
 		# This will handle disconnects and re-connects
 		for _ in range(10):
 			try:
-				response = s.get(self.base_url, timeout=1)
+				response = s.get(self.remedy.base_url, timeout=1)
 				self.speak("Re-connected to server")
 				break
 
