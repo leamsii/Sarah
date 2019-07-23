@@ -4,6 +4,7 @@ import os
 import pyttsx3
 import winsound
 
+
 class Asset:
 	def __init__(self, tower, floor, is_cart):
 		self.tower = tower
@@ -49,6 +50,9 @@ class Sarah:
 		self.voice_engine.setProperty('voice', self.voice_id)
 		self.voice_engine.setProperty('rate', 155)
 		self.voice_engine.setProperty('volume', 2)
+
+		self.speak("New ticket")
+		exit()
 
 		# Start remedy
 		self.remedy = Remedy()
