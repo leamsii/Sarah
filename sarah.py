@@ -51,9 +51,6 @@ class Sarah:
 		self.voice_engine.setProperty('rate', 155)
 		self.voice_engine.setProperty('volume', 2)
 
-		self.speak("New ticket")
-		exit()
-
 		# Start remedy
 		self.remedy = Remedy()
 
