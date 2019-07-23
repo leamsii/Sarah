@@ -75,7 +75,7 @@ class Sarah:
 		else:
 			return False
 
-	def new_ticket(ticket_id, ticket_summary):
+	def new_ticket(self, ticket_id, ticket_summary):
 		msg = "New ticket..."
 		computer_name = self.get_asset_name(s, ticket_id)
 		if computer_name:
