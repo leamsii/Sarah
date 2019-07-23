@@ -60,9 +60,9 @@ class Sarah:
 		self.speak("Searching tickets")
 		self.start()
 
-	def get_asset_name(self, session, computer_id):
+	def get_asset_name(self, session, ticket_id):
 		# Returns the computer name if one
-		data = session.get(self.remedy.get_desc(computer_id), cookies=self.remedy.session_properties)
+		data = session.get(self.remedy.get_desc(ticket_id), cookies=self.remedy.session_properties)
 		data = data.json()
 		data = data[0]['items'][0]
 		data = data['desc']
@@ -72,8 +72,8 @@ class Sarah:
 			index = len('Asset ID:') + asset_id
 			computer_name = data[index : index + 15].strip()
 			return computer_name
-		else:
-			return False
+
+		return False
 
 	def new_ticket(self, ticket_id, ticket_summary):
 		msg = "New ticket..."
@@ -103,7 +103,7 @@ class Sarah:
 
 			if not ticket_id in self.tickets:
 				# We always want to skip the first batch
-				if len(self.tickets == 0):
+				if len(self.tickets) == 0:
 					skip = True
 
 				if not skip:
@@ -119,7 +119,7 @@ class Sarah:
 			while True:
 				try:
 					self.get_tickets(s)
-					time.sleep(10)
+					time.sleep(5)
 					os.system('cls')	
 
 				except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError):
