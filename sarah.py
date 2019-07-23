@@ -4,47 +4,42 @@ import os
 import pyttsx3
 import winsound
 
-
 class Asset:
 	def __init__(self, tower, floor, is_cart):
 		self.tower = tower
 		self.floor = floor
 		self.is_cart = is_cart
 
-class Ticket:
-	def __init__(self, summary, asset = None):
-		self.asset = asset
-		self.summary = summary
-
 class Remedy:
 	def __init__(self):
-		# Set the cookies
-		self.base_url = 'https://remsmartitvp.ynhh.org:8443/ux/smart-it/#/ticket-console'
+		self.towers = {
+			'ET' : 'East Tower',
+			'WT' : 'West Tower',
+			'NE' : 'North East',
+			'NW' : 'North West',
+			'PO' : 'Podium'
+		}
 		self.session_properties = {
-		'JSESSIONID': 'AB68EEADA7B1FBBD40F96E1491788638',
-		'NSC_wtsw_sfntnbsujuwq_8443_ofx':'ffffffff0927ae1b45525d5f4f58455e445a4a421518'
+			"JSESSIONID" : "AB68EEADA7B1FBBD40F96E1491788638",
+			"NSC_wtsw_sfntnbsujuwq_8443_ofx" : "ffffffff0927ae1b45525d5f4f58455e445a4a421518"
 		}
 		# Set payload
-		self.payload = {"filterCriteria":{"assignedSupportGroups":[{"name":"Desktop Support - BH","company":{"name":"Yale New Haven Health"},"organization":"IT Support","isDefault":True,"id":"SGP000000000184"}],"statusMappings":["open"],"ticketTypes":["incident"]},"chunkInfo":{"startIndex":0,"chunkSize":75},"sortInfo":{},"attributeNames":["priority","id","assignee","summary","status","submitDate"],"customAttributeNames":[]}
+		self.payload = {"filterCriteria":{"assignedSupportGroups":[{"name":"Desktop Support - BH","company":{"name":"Yale New Haven Health"},
+		"organization":"IT Support","isDefault":True,"id":"SGP000000000184"}],"statusMappings":["open"],"ticketTypes":["incident"]},
+		"chunkInfo":{"startIndex":0,"chunkSize":75},"sortInfo":{},"attributeNames":["priority","id","assignee","summary","status","submitDate"],
+		"customAttributeNames":[]}
 
 		self.ticket_url = 'https://remsmartitvp.ynhh.org:8443/ux/rest/v2/person/workitems/get'
 
-	def get_floor_url(self, computer_id):
+	def get_desc(self, computer_id):
 		return f'https://remsmartitvp.ynhh.org:8443/ux/rest/v2/incident/{computer_id}'
 
-	def get_asset_info(self, asset_name):
-		if asset_name:
-			asset_name = asset_name.strip() # Remove any spaces
-			if len(asset_name) != 15:
-				return None
+	def get_asset(self, name):
+		tower = self.towers[name[1 : 3]]
+		floor = str(int(name[4 : 6]))
+		is_cart = 'CWM' in name
 
-			tower = self.towers[asset_name[1 : 3]]
-			floor = str(int(asset_name[4 : 6]))
-			is_cart = 'CWM' in asset_name
-
-			return Asset(tower, floor, is_cart)
-		else:
-			return None
+		return Asset(tower, floor, is_cart)
 
 class Sarah:
 	def __init__(self):
@@ -67,7 +62,7 @@ class Sarah:
 
 	def get_asset_name(self, session, computer_id):
 		# Returns the computer name if one
-		data = session.get(self.remedy.get_floor_url(computer_id), cookies=self.remedy.session_properties)
+		data = session.get(self.remedy.get_desc(computer_id), cookies=self.remedy.session_properties)
 		data = data.json()
 		data = data[0]['items'][0]
 		data = data['desc']
@@ -79,39 +74,45 @@ class Sarah:
 			return computer_name
 		else:
 			return False
+
+	def new_ticket(ticket_id, ticket_summary):
+		msg = "New ticket..."
+		computer_name = self.get_asset_name(s, ticket_id)
+		if computer_name:
+			asset = self.remedy.get_asset(computer_name)
+			cart_msg = "...This is a cart" if asset.is_cart else "...This is a PC"
+			msg += f"Located at {asset.tower} {asset.floor}{cart_msg}...{ticket_summary}"
+		else:
+			msg += ticket_summary
+			
+		self.alert()
+		self.speak(msg)
 		
 	def get_tickets(self, s):
 		data = s.post(self.remedy.ticket_url, cookies=self.remedy.session_properties, 
 				json=self.remedy.payload)
 
-		if data.status_code == 200:
+		tickets = data.json()
+		tickets = tickets[0]['items'][0]['objects']
 
-			tickets = data.json()
-			tickets = tickets[0]['items'][0]['objects']
+		# This adds tickets to the list
+		for ticket in tickets:
+			ticket_id = ticket['id']
+			ticket_summary = ticket['summary']
+			ticket_type = ticket['type']
 
-			# Handle reading the tickets
-			if len(self.tickets) != 0:
-				for t in tickets:
-					if not t['id'] in self.tickets:
-						summary = t['summary']
-						new_ticket = Ticket(summary, self.remedy.get_asset_info(self.get_asset_name(s, t['id'])))
-						self.alert()
-						if new_ticket.asset:
-							cart_msg = "...This is a cart" if new_ticket.asset.is_cart else "...This is a PC"
-							self.speak(f"New ticket...Located at {new_ticket.asset.tower} {new_ticket.asset.floor}{cart_msg}...{new_ticket.summary}")
-						else:
-							self.speak(f"New ticket...{new_ticket.summary}")
+			if not ticket_id in self.tickets:
+				# We always want to skip the first batch
+				if len(self.tickets == 0):
+					skip = True
 
-			for t in tickets:
-				_id = t['id']
-				_type = t['type']
-				summary = t['summary']
+				if not skip:
+					self.new_ticket(ticket_id, ticket_summary)
+				self.tickets.append(ticket_id)
 
-				if not _id in self.tickets:
-					self.tickets.append(t['id'])
+			print(ticket_id, ticket_type, ticket_summary)
 
-				print(_id, _type, summary)
-
+		skip = False # Dirty
 
 	def start(self):
 		with requests.Session() as s:
@@ -139,14 +140,14 @@ class Sarah:
 
 	def connect_server(self, s):
 		# This will handle disconnects and re-connects
-		for _ in range(10):
+		for _ in range(20):
 			try:
-				response = s.get(self.remedy.base_url)
+				response = s.get(self.remedy.ticket_url)
 				self.speak("Re-connected to server")
 				break
 
 			except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError):
-				print(f"Error: Disconnected, connection attempts left: {_}")
+				print(f"Error: Disconnected, connection attempts made: {_}")
 				time.sleep(3)
 		else:
 			self.speak("Could not establish a connection, ending session")
