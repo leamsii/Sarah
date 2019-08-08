@@ -4,6 +4,8 @@ import os
 import pyttsx3
 import winsound
 
+# Requests and pyttsx3 are both dependencies
+
 
 class Asset:
 	def __init__(self, tower, floor, is_cart):
@@ -18,29 +20,48 @@ class Remedy:
 			'WT' : 'West Tower',
 			'NE' : 'North East',
 			'NW' : 'North West',
-			'PO' : 'Podium'
+			'PO' : 'Podium',
+			'PT' : 'E-D',
+			'RY' : 'Perry'
 		}
-		self.session_properties = {
-			"JSESSIONID" : "AB68EEADA7B1FBBD40F96E1491788638",
-			"NSC_wtsw_sfntnbsujuwq_8443_ofx" : "ffffffff0927ae1b45525d5f4f58455e445a4a421518"
-		}
+		self.ticket_url = 'https://remsmartitvp.ynhh.org:8443/ux/rest/v2/person/workitems/get'
 		# Set payload
 		self.payload = {"filterCriteria":{"assignedSupportGroups":[{"name":"Desktop Support - BH","company":{"name":"Yale New Haven Health"},
-		"organization":"IT Support","isDefault":True,"id":"SGP000000000184"}],"statusMappings":["open"],"ticketTypes":["incident"]},
-		"chunkInfo":{"startIndex":0,"chunkSize":75},"sortInfo":{},"attributeNames":["priority","id","assignee","summary","status","submitDate"],
-		"customAttributeNames":[]}
-
-		self.ticket_url = 'https://remsmartitvp.ynhh.org:8443/ux/rest/v2/person/workitems/get'
+		"organization":"IT Support","isDefault":True,"id":"SGP000000000184"}],"statusMappings":["open"],
+		"ticketTypes":["incident"]},"chunkInfo":{"startIndex":0,"chunkSize":75},"sortInfo":{},
+		"attributeNames":["priority","id","assignee","summary","status","submitDate"],"customAttributeNames":[]}
 
 	def get_desc(self, computer_id):
 		return f'https://remsmartitvp.ynhh.org:8443/ux/rest/v2/incident/{computer_id}'
 
 	def get_asset(self, name):
 		tower = self.towers[name[1 : 3]]
-		floor = str(int(name[4 : 6]))
+		try:
+			floor = str(int(name[4 : 6]))
+		except:
+			floor = ''
+			pass
+			
 		is_cart = 'CWM' in name
 
 		return Asset(tower, floor, is_cart)
+
+	def login(self, session):
+		# Handle login into Remedy
+		username = input("Username: ").strip()
+		password = input("Password: ").strip()
+
+		login_url = f'https://remsmartitvp.ynhh.org:8443/ux/rest/users/sessions/{username}'
+		payload = {"password": password,"appName":"Galileo","appVersion":"2.0.00.000","apiVersion":1600000,"locale":"en","deviceToken":"dummyToken","os":"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36","model":"Web Client"}
+
+		r = session.post(login_url, cookies=self.session_properties, json=payload)
+
+		if(r.status_code == 200):
+			print("Log: Login successs!")
+			os.system("cls")
+		else:
+			print("Error: Invalid credentials!")
+			exit()
 
 class Sarah:
 	def __init__(self):
@@ -48,7 +69,7 @@ class Sarah:
 		self.voice_engine = pyttsx3.init()
 		self.voice_id = "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Speech\\Voices\\Tokens\\TTS_MS_EN-US_ZIRA_11.0"
 		self.voice_engine.setProperty('voice', self.voice_id)
-		self.voice_engine.setProperty('rate', 155)
+		self.voice_engine.setProperty('rate', 160)
 		self.voice_engine.setProperty('volume', 2)
 
 		# Start remedy
@@ -59,11 +80,25 @@ class Sarah:
 
 		# Look for tickets
 		self.speak("Searching tickets")
+		self.session = requests.session()
 		self.start()
 
-	def get_asset_name(self, session, ticket_id):
+	def get_session(self):
+		# This will create a new session and get the cookies/session ID
+		self.session = requests.session()
+		data = self.session.get(self.remedy.ticket_url)
+
+		session_id = data.cookies['JSESSIONID']
+		unk1 = data.cookies['NSC_wtsw_sfntnbsujuwq_8443_ofx']
+
+		self.remedy.session_properties = {
+			"JSESSIONID" : session_id,
+			"NSC_wtsw_sfntnbsujuwq_8443_ofx" : unk1
+		}
+
+	def get_asset_name(self, ticket_id):
 		# Returns the computer name if one
-		data = session.get(self.remedy.get_desc(ticket_id), cookies=self.remedy.session_properties)
+		data = self.session.get(self.remedy.get_desc(ticket_id), cookies=self.remedy.session_properties)
 		data = data.json()
 		data = data[0]['items'][0]
 		data = data['desc']
@@ -77,60 +112,66 @@ class Sarah:
 		return False
 
 	def new_ticket(self, ticket_id, ticket_summary):
+		computer_name = self.get_asset_name(ticket_id)
 		msg = "New ticket..."
-		computer_name = self.get_asset_name(s, ticket_id)
 		if computer_name:
 			asset = self.remedy.get_asset(computer_name)
-			cart_msg = "...This is a cart" if asset.is_cart else "...This is a PC"
-			msg += f"Located at {asset.tower} {asset.floor}{cart_msg}...{ticket_summary}"
-		else:
+			cart_msg = "For a cart" if asset.is_cart else "For a PC"
+
+			msg += f"{cart_msg} located at {asset.tower} {asset.floor}..."
+
+		if not "Easy" in ticket_summary:
 			msg += ticket_summary
 			
 		self.alert()
-		self.speak(msg)
+		if(len(msg) > 13):
+			self.speak(msg)
 		
-	def get_tickets(self, s):
-		data = s.post(self.remedy.ticket_url, cookies=self.remedy.session_properties, 
+	def get_tickets(self):
+		data = self.session.post(self.remedy.ticket_url, cookies=self.remedy.session_properties, 
 				json=self.remedy.payload)
 
-		tickets = data.json()
-		tickets = tickets[0]['items'][0]['objects']
+		if data.status_code == 200:
+			tickets = data.json()
+			tickets = tickets[0]['items'][0]['objects']
 
-		# This adds tickets to the list
-		for ticket in tickets:
-			ticket_id = ticket['id']
-			ticket_summary = ticket['summary']
-			ticket_type = ticket['type']
+			# This adds tickets to the list
+			skip = False
+			output_msg = ""
+			for ticket in tickets:
+				ticket_id = ticket['id']
+				ticket_summary = ticket['summary']
+				ticket_type = ticket['type']
 
-			if not ticket_id in self.tickets:
-				# We always want to skip the first batch
-				if len(self.tickets) == 0:
-					skip = True
+				if not ticket_id in self.tickets:
+					# We always want to skip the first batch
+					if len(self.tickets) == 0:
+						skip = True
 
-				if not skip:
-					self.new_ticket(ticket_id, ticket_summary)
-				self.tickets.append(ticket_id)
+					if not skip:
+						self.new_ticket(ticket_id, ticket_summary)
+					self.tickets.append(ticket_id)
 
-			print(ticket_id, ticket_type, ticket_summary)
+				output_msg += f"{ticket_id} {ticket_type} {ticket_summary}\n"
 
-		skip = False # Dirty
+			os.system('cls')
+			print(output_msg)
+			time.sleep(10)
 
 	def start(self):
-		with requests.Session() as s:
-			while True:
-				try:
-					self.get_tickets(s)
-					time.sleep(5)
-					os.system('cls')	
+		self.get_session()
+		self.remedy.login(self.session)
+		while True:
+			try:
+				self.get_tickets()
 
-				except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError):
-					self.speak("I was disconnected from the server, trying to re-connect")
-					self.connect_server(s)
+			except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError):
+				self.connect_server()
 
-				except Exception as e:
-					self.speak("Unknown error, look at the logs for details.")
-					print(e)
-					exit()
+			except Exception as e:
+				self.speak("Unknown error, look at the logs for details.")
+				print(e)
+				exit()
 
 	def speak(self, msg):
 		self.voice_engine.say(msg)
@@ -139,12 +180,11 @@ class Sarah:
 	def alert(self):
 		winsound.PlaySound('alert.wav', winsound.SND_FILENAME)
 
-	def connect_server(self, s):
+	def connect_server(self):
 		# This will handle disconnects and re-connects
 		for _ in range(20):
 			try:
-				response = s.get(self.remedy.ticket_url)
-				self.speak("Re-connected to server")
+				self.get_tickets()
 				break
 
 			except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError):
