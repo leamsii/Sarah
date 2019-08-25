@@ -51,8 +51,9 @@ class Remedy:
 		username = input("Username: ").strip()
 		password = input("Password: ").strip()
 
-		login_url = f'https://remsmartitvp.ynhh.org:8443/ux/rest/users/sessions/{username}'
-		payload = {"password": password,"appName":"Galileo","appVersion":"2.0.00.000","apiVersion":1600000,"locale":"en","deviceToken":"dummyToken","os":"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36","model":"Web Client"}
+		login_url = f"https://remsmartitvp.ynhh.org:8443/ux/rest/users/sessions/{username}"
+		payload = {"password": password,"appName":"Galileo","appVersion":"2.0.00.000","apiVersion":1600000,"locale":"en","deviceToken":"dummyToken",
+			"os":"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36","model":"Web Client"}
 
 		r = session.post(login_url, cookies=self.session_properties, json=payload)
 
