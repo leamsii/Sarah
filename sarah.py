@@ -8,6 +8,8 @@ import os
 import winsound
 import sys
 import getpass
+import re
+from colorama import Fore, Back, Style 
 
 
 # Make sure Python 3+ is running
@@ -22,8 +24,9 @@ TOWERS = {
 'NE' : 'North East',
 'NW' : 'North West',
 'PO' : 'Podium',
-'PT' : 'E-D',
-'RY' : 'Perry'
+'PT' : 'The E-D',
+'RY' : 'Perry',
+'MH' : 'Mill Hill'
 }
 
 REFRESH_RATE = 10 # How often tickets are refreshed
@@ -76,7 +79,7 @@ class Remedy:
 		response = session.post(self.urls['login_url'] + username, cookies = self.session_properties, json = payload)
 
 		# If login success
-		if r.status_code == 200:
+		if response.status_code == 200:
 			os.system("cls")
 		else:
 			print("Error: Invalid credentials")
@@ -115,6 +118,8 @@ class Sarah:
 		self.session = self.remedy.set_session() # Get the new session from the Remedy API
 		self.remedy.login(self.session) # Have the user login
 
+		self.speak("Searching tickets...")
+
 		# Main loop
 		while True:
 			try:
@@ -142,49 +147,64 @@ class Sarah:
 				if len(self.tickets) == 0:
 					for _ in ticket_list:
 						self.tickets.append(Ticket(_)._id) # Skip the first batch
+					return
 				else:
 					# Handle new tickets
-					for data in ticket_list:
+					for k,data in enumerate(ticket_list):
 						new_ticket = Ticket(data)
 						if not new_ticket._id in self.tickets:
 							self.update_tickets(new_ticket)
 							self.tickets.append(new_ticket._id)
 
-						result_msg += f"{new_ticket._id} {new_ticket.summary}\n"
+						result_msg += f"[{k}]\t{new_ticket.summary}"
+
+						# Show asset location
+						asset_name = self.get_asset_name(new_ticket)
+						if asset_name:
+							asset = Asset(asset_name)
+							result_msg += Fore.YELLOW + f" ({asset.tower} {asset.floor})" + Style.RESET_ALL
+						result_msg += "\n"
 
 				# Show the list of tickets
 				os.system('cls')
 				print(result_msg)
 				time.sleep(REFRESH_RATE)
 
-	def get_asset_name(self, ticket_id):
+	def get_asset_name(self, ticket):
 		# Returns the computer name if one
-		response = self.session.get(self.remedy.urls['get_desc'] + ticket_id, cookies = self.remedy.session_properties)
+		response = self.session.get(self.remedy.urls['get_desc'] + ticket._id, cookies = self.remedy.session_properties)
 		data = response.json()
-		data = response[0]['items'][0]['desc']
+		data = data[0]['items'][0]
+		data = data['desc']
 
 		# Use regular expressions to loop through the description for a asset location
-		computer_name = re.search('\D\D\D\D\d\d\d\d\d\d\d\D\D\D\D', data) # Check this regular expression
+		computer_name = re.search('\D\D\D\D\d\d\d\d\d\d\d\D\D\D\D', data)
 		try:
 			return computer_name.group()
 		except:
-			return False
+			try:
+				computer_name = re.search('\D\D\D\D\d\d\d\d\d\d\d\D\D\D\D', ticket.summary)
+				return computer_name.group()
+			except:
+				return False
 
 	def update_tickets(self, ticket):
-		computer_name = self.get_asset_name(ticket._id) # Get the computer name
+		computer_name = self.get_asset_name(ticket) # Get the computer name
 		msg = "New ticket..."
 		if computer_name:
 			asset = Asset(computer_name.upper())
 
 			cart_msg = "For a cart" if asset.cart else "For a PC"
-			msg += f"{cart_msg} located at {asset.tower} {asset.floor}..."
+			msg += f"{cart_msg} in {asset.tower} {asset.floor}..."
 
 		# Skip easy button pressed
 		if not "Easy" in ticket.summary:
 			msg += ticket.summary
-			
-		self.alert()
-		self.speak(msg)
+
+		# If not created by IT agent
+		if not ticket.summary.startswith('BH'):
+			self.alert()
+			self.speak(msg)
 
 	def speak(self, msg):
 		self.voice_engine.say(msg)
