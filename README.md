@@ -1,3 +1,4 @@
 # Sarah
 Remedy API
-Simple hands off Python ticket alert system
+
+Read aloud tickets coming into the queue
