@@ -1,68 +1,99 @@
+
+# Dependencies
 import requests
+import pyttsx3
+#-------------
 import time
 import os
-import pyttsx3
 import winsound
+import sys
+import getpass
 
-# Requests and pyttsx3 are both dependencies
 
+# Make sure Python 3+ is running
+if not sys.version_info >= (3, 0):
+	print("Error: Please upgrade to Python 3+")
+	exit()
+
+# Define global variables
+TOWERS = {
+'ET' : 'East Tower',
+'WT' : 'West Tower',
+'NE' : 'North East',
+'NW' : 'North West',
+'PO' : 'Podium',
+'PT' : 'E-D',
+'RY' : 'Perry'
+}
+
+REFRESH_RATE = 10 # How often tickets are refreshed
+CONNECTION_ATTEMPTS = 100 # How many times is Sarah allowed to attempt to reconnect after d/c
 
 class Asset:
-	def __init__(self, tower, floor, is_cart):
-		self.tower = tower
-		self.floor = floor
-		self.is_cart = is_cart
+	def __init__(self, asset_name):
 
+		# This will collect the asset location
+		self.tower = TOWERS[asset_name[1 : 3]]
+		self.cart = 'CWM' in asset_name
+
+		# Must wrap this when converting string to int
+		try:
+			self.floor = str(int(asset_name[4 : 6]))
+		except ValueError:
+			self.floor = ''
+
+class Ticket:
+	def __init__(self, data):
+		self._id = data['id']
+		self.summary = data['summary']
+		self.type = data['type']
+
+# Remedy API
 class Remedy:
 	def __init__(self):
-		self.towers = {
-			'ET' : 'East Tower',
-			'WT' : 'West Tower',
-			'NE' : 'North East',
-			'NW' : 'North West',
-			'PO' : 'Podium',
-			'PT' : 'E-D',
-			'RY' : 'Perry'
+
+		self.urls = {
+			"get_ticket": "https://remsmartitvp.ynhh.org:8443/ux/rest/v2/person/workitems/get",
+			"get_desc"  : "https://remsmartitvp.ynhh.org:8443/ux/rest/v2/incident/",
+			"login_url" :"https://remsmartitvp.ynhh.org:8443/ux/rest/users/sessions/"
 		}
-		self.ticket_url = 'https://remsmartitvp.ynhh.org:8443/ux/rest/v2/person/workitems/get'
+
 		# Set payload
 		self.payload = {"filterCriteria":{"assignedSupportGroups":[{"name":"Desktop Support - BH","company":{"name":"Yale New Haven Health"},
 		"organization":"IT Support","isDefault":True,"id":"SGP000000000184"}],"statusMappings":["open"],
 		"ticketTypes":["incident"]},"chunkInfo":{"startIndex":0,"chunkSize":75},"sortInfo":{},
 		"attributeNames":["priority","id","assignee","summary","status","submitDate"],"customAttributeNames":[]}
 
-	def get_desc(self, computer_id):
-		return f'https://remsmartitvp.ynhh.org:8443/ux/rest/v2/incident/{computer_id}'
-
-	def get_asset(self, name):
-		tower = self.towers[name[1 : 3]]
-		try:
-			floor = str(int(name[4 : 6]))
-		except:
-			floor = ''
-			pass
-			
-		is_cart = 'CWM' in name
-
-		return Asset(tower, floor, is_cart)
 
 	def login(self, session):
-		# Handle login into Remedy
-		username = input("Username: ").strip()
-		password = input("Password: ").strip()
+		username = input("Username: ").strip().lower()
+		password = getpass.getpass().strip()
 
-		login_url = f"https://remsmartitvp.ynhh.org:8443/ux/rest/users/sessions/{username}"
 		payload = {"password": password,"appName":"Galileo","appVersion":"2.0.00.000","apiVersion":1600000,"locale":"en","deviceToken":"dummyToken",
 			"os":"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36","model":"Web Client"}
 
-		r = session.post(login_url, cookies=self.session_properties, json=payload)
+		# Send payload information to server
+		response = session.post(self.urls['login_url'] + username, cookies = self.session_properties, json = payload)
 
-		if(r.status_code == 200):
-			print("Log: Login successs!")
+		# If login success
+		if r.status_code == 200:
 			os.system("cls")
 		else:
-			print("Error: Invalid credentials!")
-			exit()
+			print("Error: Invalid credentials")
+			self.login(session)
+
+	def set_session(self):
+		# This function will return a new session
+		session = requests.session()
+		data = session.get(self.urls['get_ticket']) # Request some data
+
+		# Set the cookies for the session
+		self.session_properties = {
+			"JSESSIONID" : data.cookies['JSESSIONID'],
+			"NSC_wtsw_sfntnbsujuwq_8443_ofx" : data.cookies['NSC_wtsw_sfntnbsujuwq_8443_ofx']
+		}
+		return session
+
 
 class Sarah:
 	def __init__(self):
@@ -75,93 +106,16 @@ class Sarah:
 
 		# Start remedy
 		self.remedy = Remedy()
-
 		# Define tickets
 		self.tickets = []
 
-		# Look for tickets
-		self.speak("Searching tickets")
-		self.session = requests.session()
 		self.start()
 
-	def get_session(self):
-		# This will create a new session and get the cookies/session ID
-		self.session = requests.session()
-		data = self.session.get(self.remedy.ticket_url)
-
-		session_id = data.cookies['JSESSIONID']
-		unk1 = data.cookies['NSC_wtsw_sfntnbsujuwq_8443_ofx']
-
-		self.remedy.session_properties = {
-			"JSESSIONID" : session_id,
-			"NSC_wtsw_sfntnbsujuwq_8443_ofx" : unk1
-		}
-
-	def get_asset_name(self, ticket_id):
-		# Returns the computer name if one
-		data = self.session.get(self.remedy.get_desc(ticket_id), cookies=self.remedy.session_properties)
-		data = data.json()
-		data = data[0]['items'][0]
-		data = data['desc']
-
-		if 'Asset ID:' in data:
-			asset_id = data.index('Asset ID:')
-			index = len('Asset ID:') + asset_id
-			computer_name = data[index : index + 15].strip()
-			return computer_name
-
-		return False
-
-	def new_ticket(self, ticket_id, ticket_summary):
-		computer_name = self.get_asset_name(ticket_id)
-		msg = "New ticket..."
-		if computer_name:
-			asset = self.remedy.get_asset(computer_name)
-			cart_msg = "For a cart" if asset.is_cart else "For a PC"
-
-			msg += f"{cart_msg} located at {asset.tower} {asset.floor}..."
-
-		if not "Easy" in ticket_summary:
-			msg += ticket_summary
-			
-		self.alert()
-		if(len(msg) > 13):
-			self.speak(msg)
-		
-	def get_tickets(self):
-		data = self.session.post(self.remedy.ticket_url, cookies=self.remedy.session_properties, 
-				json=self.remedy.payload)
-
-		if data.status_code == 200:
-			tickets = data.json()
-			tickets = tickets[0]['items'][0]['objects']
-
-			# This adds tickets to the list
-			skip = False
-			output_msg = ""
-			for ticket in tickets:
-				ticket_id = ticket['id']
-				ticket_summary = ticket['summary']
-				ticket_type = ticket['type']
-
-				if not ticket_id in self.tickets:
-					# We always want to skip the first batch
-					if len(self.tickets) == 0:
-						skip = True
-
-					if not skip:
-						self.new_ticket(ticket_id, ticket_summary)
-					self.tickets.append(ticket_id)
-
-				output_msg += f"{ticket_id} {ticket_type} {ticket_summary}\n"
-
-			os.system('cls')
-			print(output_msg)
-			time.sleep(10)
-
 	def start(self):
-		self.get_session()
-		self.remedy.login(self.session)
+		self.session = self.remedy.set_session() # Get the new session from the Remedy API
+		self.remedy.login(self.session) # Have the user login
+
+		# Main loop
 		while True:
 			try:
 				self.get_tickets()
@@ -174,6 +128,64 @@ class Sarah:
 				print(e)
 				exit()
 
+
+	def get_tickets(self):
+		# Send a request to the server with correct header
+		response = self.session.post(self.remedy.urls['get_ticket'], cookies = self.remedy.session_properties, 
+				json = self.remedy.payload)
+
+		# Success
+		result_msg = ""
+		if response.status_code == 200:
+				ticket_list = response.json()[0]['items'][0]['objects']
+
+				if len(self.tickets) == 0:
+					for _ in ticket_list:
+						self.tickets.append(Ticket(_)._id) # Skip the first batch
+				else:
+					# Handle new tickets
+					for data in ticket_list:
+						new_ticket = Ticket(data)
+						if not new_ticket._id in self.tickets:
+							self.update_tickets(new_ticket)
+							self.tickets.append(new_ticket._id)
+
+						result_msg += f"{new_ticket._id} {new_ticket.summary}\n"
+
+				# Show the list of tickets
+				os.system('cls')
+				print(result_msg)
+				time.sleep(REFRESH_RATE)
+
+	def get_asset_name(self, ticket_id):
+		# Returns the computer name if one
+		response = self.session.get(self.remedy.urls['get_desc'] + ticket_id, cookies = self.remedy.session_properties)
+		data = response.json()
+		data = response[0]['items'][0]['desc']
+
+		# Use regular expressions to loop through the description for a asset location
+		computer_name = re.search('\D\D\D\D\d\d\d\d\d\d\d\D\D\D\D', data) # Check this regular expression
+		try:
+			return computer_name.group()
+		except:
+			return False
+
+	def update_tickets(self, ticket):
+		computer_name = self.get_asset_name(ticket._id) # Get the computer name
+		msg = "New ticket..."
+		if computer_name:
+			asset = Asset(computer_name.upper())
+
+			cart_msg = "For a cart" if asset.cart else "For a PC"
+			msg += f"{cart_msg} located at {asset.tower} {asset.floor}..."
+
+		# Skip easy button pressed
+		if not "Easy" in ticket.summary:
+			msg += ticket.summary
+			
+		self.alert()
+		self.speak(msg)
+
 	def speak(self, msg):
 		self.voice_engine.say(msg)
 		self.voice_engine.runAndWait()
@@ -183,14 +195,14 @@ class Sarah:
 
 	def connect_server(self):
 		# This will handle disconnects and re-connects
-		for _ in range(20):
+		for _ in range(CONNECTION_ATTEMPTS):
 			try:
 				self.get_tickets()
 				break
 
 			except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError):
 				print(f"Error: Disconnected, connection attempts made: {_}")
-				time.sleep(3)
+				time.sleep(5)
 		else:
 			self.speak("Could not establish a connection, ending session")
 			exit()
@@ -198,3 +210,4 @@ class Sarah:
 if __name__ == '__main__':
 	print("Log: Connecting to server..")
 	Sarah()
+
