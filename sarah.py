@@ -26,7 +26,8 @@ TOWERS = {
 'PO' : 'Podium',
 'PT' : 'The E-D',
 'RY' : 'Perry',
-'MH' : 'Mill Hill'
+'MH' : 'Mill Hill',
+'MS' : 'Mill Hill'
 }
 
 REFRESH_RATE = 10 # How often tickets are refreshed
@@ -161,7 +162,7 @@ class Sarah:
 						# Show asset location
 						asset_name = self.get_asset_name(new_ticket)
 						if asset_name:
-							asset = Asset(asset_name)
+							asset = Asset(asset_name.upper())
 							result_msg += Fore.YELLOW + f" ({asset.tower} {asset.floor})" + Style.RESET_ALL
 						result_msg += "\n"
 
