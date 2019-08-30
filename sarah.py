@@ -168,6 +168,7 @@ class Sarah:
 
 				# Show the list of tickets
 				os.system('cls')
+				print(Back.GREEN + "Sarah  Version 2.0\n" + Style.RESET_ALL)
 				print(result_msg)
 				time.sleep(REFRESH_RATE)
 
