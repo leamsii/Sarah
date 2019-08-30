@@ -180,15 +180,11 @@ class Sarah:
 		data = data['desc']
 
 		# Use regular expressions to loop through the description for a asset location
-		computer_name = re.search('\D\D\D\D\d\d\d\d\d\d\d\D\D\D\D', data)
-		try:
-			return computer_name.group()
-		except:
-			try:
-				computer_name = re.search('\D\D\D\D\d\d\d\d\d\d\d\D\D\D\D', ticket.summary)
-				return computer_name.group()
-			except:
-				return False
+		computer_name = re.search('\D\D\D\D\d\d\d\d\d\d\d\D\D\D\D', data + ticket.summary)
+
+		if not computer_name:
+			return False
+		return computer_name.group()
 
 	def update_tickets(self, ticket):
 		computer_name = self.get_asset_name(ticket) # Get the computer name
