@@ -1,7 +1,8 @@
 
-# Dependencies
+# Dependencies make sure to install these using pip
 import requests
 import pyttsx3
+from colorama import Fore, Back, Style 
 #-------------
 import time
 import os
@@ -9,7 +10,6 @@ import winsound
 import sys
 import getpass
 import re
-from colorama import Fore, Back, Style 
 
 
 # Make sure Python 3+ is running
@@ -17,7 +17,7 @@ if not sys.version_info >= (3, 0):
 	print("Error: Please upgrade to Python 3+")
 	exit()
 
-# Define global variables
+# These are the tower location dependent of the hospital
 TOWERS = {
 'ET' : 'East Tower',
 'WT' : 'West Tower',
@@ -33,6 +33,7 @@ TOWERS = {
 
 REFRESH_RATE = 10 # How often tickets are refreshed
 CONNECTION_ATTEMPTS = 100 # How many times is Sarah allowed to attempt to reconnect after d/c
+HOSPITAL_LETTER = 'B'
 
 class Asset:
 	def __init__(self, asset_name):
@@ -113,12 +114,17 @@ class Sarah:
 		self.remedy = Remedy()
 		# Define tickets
 		self.tickets = []
-
 		self.start()
 
 	def start(self):
-		self.session = self.remedy.set_session() # Get the new session from the Remedy API
-		self.remedy.login(self.session) # Have the user login
+		print("Log: Connecting to server.")
+		try:
+			self.session = self.remedy.set_session() # Get the new session from the Remedy API
+			self.remedy.login(self.session) # Have the user login
+		except requests.ConnectionError as e:
+			print("Error: Could not connect to server.")
+			os.system("PAUSE")
+			exit()
 
 		self.speak("Searching tickets...")
 
@@ -133,6 +139,7 @@ class Sarah:
 			except Exception as e:
 				self.speak("Unknown error, look at the logs for details.")
 				print(e)
+				os.system("PAUSE")
 				exit()
 
 
@@ -141,7 +148,7 @@ class Sarah:
 		response = self.session.post(self.remedy.urls['get_ticket'], cookies = self.remedy.session_properties, 
 				json = self.remedy.payload)
 
-		# Success
+		# Handles new and old tickets
 		result_msg = ""
 		if response.status_code == 200:
 				ticket_list = response.json()[0]['items'][0]['objects']
@@ -174,34 +181,31 @@ class Sarah:
 				time.sleep(REFRESH_RATE)
 
 	def get_asset_name(self, ticket):
-		# Returns the computer name if one
+		# Returns the computer name if found
 		response = self.session.get(self.remedy.urls['get_desc'] + ticket._id, cookies = self.remedy.session_properties)
 		data = response.json()
 		data = data[0]['items'][0]
 		data = data['desc']
 
-		# Use regular expressions to loop through the description for a asset location
-		computer_name = re.search('B\S\D\D\d\d\d\d\d\d\d\D\D\D\D', data + ticket.summary)
-
-		if not computer_name:
-			return False
-		return computer_name.group()
+		# Use regular expressions to loop through the description and summary for the computer name
+		computer_name = re.search(f'{HOSPITAL_LETTER}\S\D\D\d\d\d\d\d\d\d\D\D\D\D', data + ticket.summary)
+		return False if not computer_name else computer_name.group()
 
 	def update_tickets(self, ticket):
 		computer_name = self.get_asset_name(ticket) # Get the computer name
 		msg = "New ticket..."
 		if computer_name:
-			asset = Asset(computer_name.upper())
-
+			asset = Asset(computer_name.upper()) # Create a new asset for that computer name
 			cart_msg = "For a cart" if asset.cart else "For a PC"
 			msg += f"{cart_msg} in {asset.tower} {asset.floor}..."
 
-		# Skip easy button pressed
-		if not "Easy" in ticket.summary:
-			msg += ticket.summary
-
 		# If not created by IT agent
-		if not ticket.summary.startswith('BH'):
+		if not ticket.summary.startswith('{HOSPITAL_LETTER}H'):
+			# Skip easy button pressed
+			if not "Easy" in ticket.summary:
+				msg += ticket.summary
+
+			# Speak
 			self.alert()
 			self.speak(msg)
 
@@ -214,19 +218,18 @@ class Sarah:
 
 	def connect_server(self):
 		# This will handle disconnects and re-connects
+		print("Error: Lost connection trying to re-connect..")
 		for _ in range(CONNECTION_ATTEMPTS):
 			try:
 				self.get_tickets()
 				break
 
 			except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError):
-				print(f"Error: Disconnected, connection attempts made: {_}")
 				time.sleep(5)
 		else:
 			self.speak("Could not establish a connection, ending session")
 			exit()
 
 if __name__ == '__main__':
-	print("Log: Connecting to server..")
 	Sarah()
 
