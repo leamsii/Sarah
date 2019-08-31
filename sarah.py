@@ -33,7 +33,6 @@ TOWERS = {
 
 REFRESH_RATE = 10 # How often tickets are refreshed
 CONNECTION_ATTEMPTS = 100 # How many times is Sarah allowed to attempt to reconnect after d/c
-HOSPITAL_LETTER = 'B'
 
 class Asset:
 	def __init__(self, asset_name):
@@ -41,18 +40,14 @@ class Asset:
 		# This will collect the asset location
 		self.tower = TOWERS[asset_name[1 : 3]]
 		self.cart = 'CWM' in asset_name
-
-		# Must wrap this when converting string to int
-		try:
-			self.floor = str(int(asset_name[4 : 6]))
-		except ValueError:
-			self.floor = ''
+		self.floor = asset_name[4 : 6] if asset_name[4 : 6].isdigit() else ""
 
 class Ticket:
 	def __init__(self, data):
 		self._id = data['id']
 		self.summary = data['summary']
 		self.type = data['type']
+		self.asset = None
 
 # Remedy API
 class Remedy:
@@ -72,7 +67,7 @@ class Remedy:
 
 
 	def login(self, session):
-		username = input("Username: ").strip().lower()
+		username = input("Username: ").strip()
 		password = getpass.getpass().strip()
 
 		payload = {"password": password,"appName":"Galileo","appVersion":"2.0.00.000","apiVersion":1600000,"locale":"en","deviceToken":"dummyToken",
@@ -113,27 +108,22 @@ class Sarah:
 		# Start remedy
 		self.remedy = Remedy()
 		# Define tickets
-		self.tickets = []
+		self.tickets = {}
 		self.start()
 
 	def start(self):
 		print("Log: Connecting to server.")
-		try:
-			self.session = self.remedy.set_session() # Get the new session from the Remedy API
-			self.remedy.login(self.session) # Have the user login
-		except requests.ConnectionError as e:
-			print("Error: Could not connect to server.")
-			os.system("PAUSE")
-			exit()
 
+		self.session = self.remedy.set_session() # Get the new session from the Remedy API
+		self.remedy.login(self.session) # Have the user login
 		self.speak("Searching tickets...")
 
 		# Main loop
 		while True:
 			try:
 				self.get_tickets()
-
 			except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError):
+				# If lost connection, reconnect
 				self.connect_server()
 
 			except Exception as e:
@@ -149,36 +139,57 @@ class Sarah:
 				json = self.remedy.payload)
 
 		# Handles new and old tickets
-		result_msg = ""
 		if response.status_code == 200:
 				ticket_list = response.json()[0]['items'][0]['objects']
 
-				if len(self.tickets) == 0:
-					for _ in ticket_list:
-						self.tickets.append(Ticket(_)._id) # Skip the first batch
+				# Skip the first batch
+				if not self.tickets:
+					for data in ticket_list:
+						# Assign an asset to the ticket and add it to the list
+						self.add_ticket(Ticket(data))
 					return
-				else:
-					# Handle new tickets
-					for k,data in enumerate(ticket_list):
-						new_ticket = Ticket(data)
-						if not new_ticket._id in self.tickets:
-							self.update_tickets(new_ticket)
-							self.tickets.append(new_ticket._id)
 
-						result_msg += f"[{k}]\t{new_ticket.summary}"
+				result_msg = ""
+				for key, data in enumerate(ticket_list):
+					current_ticket = Ticket(data)
+					if not self.tickets.get(current_ticket._id): # New ticket
+						self.add_ticket(current_ticket, True)
 
-						# Show asset location
-						asset_name = self.get_asset_name(new_ticket)
-						if asset_name:
-							asset = Asset(asset_name.upper())
-							result_msg += Fore.YELLOW + f" ({asset.tower} {asset.floor})" + Style.RESET_ALL
-						result_msg += "\n"
+					# Collect information
+					result_msg += f"[{key}]\t{current_ticket.summary}"
+					if current_ticket.asset:
+						result_msg += Fore.YELLOW + f" ({current_ticket.asset.tower} {current_ticket.asset.floor})" + Style.RESET_ALL
+					result_msg += "\n"
 
 				# Show the list of tickets
 				os.system('cls')
 				print(Back.GREEN + "Sarah  Version 2.0\n" + Style.RESET_ALL)
 				print(result_msg)
 				time.sleep(REFRESH_RATE)
+
+	def add_ticket(self, ticket, announce=False):
+		self.tickets[ticket._id] = ticket
+		# Give it an asset
+		asset_name = self.get_asset_name(ticket)
+		if asset_name:
+			ticket.asset = Asset(asset_name.upper())
+
+		# Announce it
+		if announce:
+			msg = "New ticket..."
+			if ticket.asset:
+				cart_msg = "For a cart" if ticket.asset.cart else "For a PC"
+				msg += f"{cart_msg} in {ticket.asset.tower} {ticket.asset.floor}..."
+
+			# If not created by IT agent
+			if not ticket.summary.startswith('BH'):
+				# Skip easy button pressed
+				if not "Easy" in ticket.summary:
+					msg += ticket.summary
+
+				# Speak
+				self.alert()
+				self.speak(msg)
 
 	def get_asset_name(self, ticket):
 		# Returns the computer name if found
@@ -188,26 +199,9 @@ class Sarah:
 		data = data['desc']
 
 		# Use regular expressions to loop through the description and summary for the computer name
-		computer_name = re.search(f'{HOSPITAL_LETTER}\S\D\D\d\d\d\d\d\d\d\D\D\D\D', data + ticket.summary)
+		computer_name = re.search('\D\S\D\D\d\d\d\d\d\d\d\D\D\D\D', data + ticket.summary)
 		return False if not computer_name else computer_name.group()
 
-	def update_tickets(self, ticket):
-		computer_name = self.get_asset_name(ticket) # Get the computer name
-		msg = "New ticket..."
-		if computer_name:
-			asset = Asset(computer_name.upper()) # Create a new asset for that computer name
-			cart_msg = "For a cart" if asset.cart else "For a PC"
-			msg += f"{cart_msg} in {asset.tower} {asset.floor}..."
-
-		# If not created by IT agent
-		if not ticket.summary.startswith('{HOSPITAL_LETTER}H'):
-			# Skip easy button pressed
-			if not "Easy" in ticket.summary:
-				msg += ticket.summary
-
-			# Speak
-			self.alert()
-			self.speak(msg)
 
 	def speak(self, msg):
 		self.voice_engine.say(msg)
