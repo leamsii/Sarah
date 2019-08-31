@@ -27,7 +27,8 @@ TOWERS = {
 'PT' : 'The E-D',
 'RY' : 'Perry',
 'MH' : 'Mill Hill',
-'MS' : 'Mill Hill'
+'MS' : 'Mill Hill',
+'2M' : 'Mill Hill'
 }
 
 REFRESH_RATE = 10 # How often tickets are refreshed
@@ -180,7 +181,7 @@ class Sarah:
 		data = data['desc']
 
 		# Use regular expressions to loop through the description for a asset location
-		computer_name = re.search('\D\D\D\D\d\d\d\d\d\d\d\D\D\D\D', data + ticket.summary)
+		computer_name = re.search('B\S\D\D\d\d\d\d\d\d\d\D\D\D\D', data + ticket.summary)
 
 		if not computer_name:
 			return False
