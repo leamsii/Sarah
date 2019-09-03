@@ -44,6 +44,10 @@ class Asset:
 		self.tower = TOWERS[asset_name[1 : 3]]
 		self.cart = 'CWM' in asset_name
 		self.floor = int(asset_name[4 : 6]) if asset_name[4 : 6].isdigit() else ""
+		
+		if self.floor and self.floor > 10:
+			self.floor = ""
+
 
 class Ticket:
 	def __init__(self, data):
