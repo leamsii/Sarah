@@ -1,4 +1,5 @@
 
+# -*- coding: utf-8 -*-
 # Dependencies make sure to install these using pip
 import requests
 import pyttsx3
@@ -25,13 +26,15 @@ TOWERS = {
 'NW' : 'North West',
 'PO' : 'Podium',
 'PT' : 'The E-D',
+'ED' : 'The E-D',
 'RY' : 'Perry',
-'MH' : 'Mill Hill',
-'MS' : 'Mill Hill',
-'2M' : 'Mill Hill'
+'MH' : 'Albin',
+'MS' : 'Marsh',
+'2M' : 'Mill Hill',
+'WH' : 'White House'
 }
 
-REFRESH_RATE = 10 # How often tickets are refreshed
+REFRESH_RATE = 5 # How often tickets are refreshed
 CONNECTION_ATTEMPTS = 100 # How many times is Sarah allowed to attempt to reconnect after d/c
 
 class Asset:
@@ -40,7 +43,7 @@ class Asset:
 		# This will collect the asset location
 		self.tower = TOWERS[asset_name[1 : 3]]
 		self.cart = 'CWM' in asset_name
-		self.floor = asset_name[4 : 6] if asset_name[4 : 6].isdigit() else ""
+		self.floor = int(asset_name[4 : 6]) if asset_name[4 : 6].isdigit() else ""
 
 class Ticket:
 	def __init__(self, data):
@@ -140,6 +143,7 @@ class Sarah:
 
 		# Handles new and old tickets
 		if response.status_code == 200:
+				# Grab the list of tickets currently in the queue
 				ticket_list = response.json()[0]['items'][0]['objects']
 
 				# Skip the first batch
@@ -149,18 +153,22 @@ class Sarah:
 						self.add_ticket(Ticket(data))
 					return
 
+				# Search for new tickets
 				result_msg = ""
 				for key, data in enumerate(ticket_list):
 					current_ticket = Ticket(data)
 					if not self.tickets.get(current_ticket._id): # New ticket
 						self.add_ticket(current_ticket, True)
 
-					# Collect information
+					# Update the summary
+					self.tickets.get(current_ticket._id).summary = current_ticket.summary
+					
+					current_ticket = self.tickets.get(current_ticket._id)
 					result_msg += f"[{key}]\t{current_ticket.summary}"
 					if current_ticket.asset:
 						result_msg += Fore.YELLOW + f" ({current_ticket.asset.tower} {current_ticket.asset.floor})" + Style.RESET_ALL
 					result_msg += "\n"
-
+					
 				# Show the list of tickets
 				os.system('cls')
 				print(Back.GREEN + "Sarah  Version 2.0\n" + Style.RESET_ALL)
@@ -199,7 +207,7 @@ class Sarah:
 		data = data['desc']
 
 		# Use regular expressions to loop through the description and summary for the computer name
-		computer_name = re.search('\D\S\D\D\d\d\d\d\d\d\d\D\D\D\D', data + ticket.summary)
+		computer_name = re.search('\D\S\D\D\d\d\d\d\S\S\S\D\D\D\D', data + ticket.summary)
 		return False if not computer_name else computer_name.group()
 
 
