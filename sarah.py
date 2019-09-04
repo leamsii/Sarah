@@ -28,9 +28,10 @@ TOWERS = {
 'PT' : 'The E-D',
 'ED' : 'The E-D',
 'RY' : 'Perry',
-'MH' : 'Albin',
+'BR' : 'Perry',
+'MH' : 'Mill Hill',
 'MS' : 'Marsh',
-'2M' : 'Mill Hill',
+'2M' : 'Albin',
 'WH' : 'White House'
 }
 
