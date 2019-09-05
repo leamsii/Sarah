@@ -3,7 +3,7 @@
 # Dependencies make sure to install these using pip
 import requests
 import pyttsx3
-from colorama import Fore, Back, Style 
+from colorama import Fore, Back, Style
 #-------------
 import time
 import os
@@ -42,6 +42,7 @@ class Asset:
 	def __init__(self, asset_name):
 
 		# This will collect the asset location
+		self.name = asset_name
 		self.tower = TOWERS[asset_name[1 : 3]] if TOWERS.get(asset_name[1 : 3]) else "Unknown"
 		self.cart = 'CWM' in asset_name
 		self.floor = int(asset_name[4 : 6]) if asset_name[4 : 6].isdigit() else ""
