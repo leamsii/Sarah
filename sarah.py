@@ -36,7 +36,7 @@ TOWERS = {
 'WH' : 'White House'
 }
 
-REFRESH_RATE = 5 # How often tickets are refreshed
+REFRESH_RATE = 10 # How often tickets are refreshed
 CONNECTION_ATTEMPTS = 100 # How many times is Sarah allowed to attempt to reconnect after d/c
 
 class Asset:
