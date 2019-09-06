@@ -1,6 +1,7 @@
 
 # -*- coding: utf-8 -*-
 # Dependencies make sure to install these using pip
+
 import requests
 import pyttsx3
 from colorama import Fore, Back, Style
