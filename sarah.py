@@ -202,7 +202,8 @@ class Sarah:
 				if not "Easy" in ticket.summary:
 					msg += ticket.summary
 
-				if 'BPT-OR-Alert' in ticket.summary:
+				# Handle O-R Alerts
+				if "BPT-OR-Alert" in ticket.summary:
 					msg += "OR-Alert"
 
 				# Speak
@@ -230,10 +231,9 @@ class Sarah:
 
 	def connect_server(self):
 		# This will handle disconnects and re-connects
-		print("Error: Lost connection trying to re-connect..")
+		print("Log: Lost connection to server, re-connecting..")
 		for _ in range(CONNECTION_ATTEMPTS):
 			try:
-				print("Log: Trying to reconnect..")
 				self.get_tickets()
 				break
 
