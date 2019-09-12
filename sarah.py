@@ -28,7 +28,7 @@ TOWERS = {
 'PO' : 'Podium',
 'PT' : 'The E-D',
 'ED' : 'The E-D',
-'RY' : 'Perry',
+'PR' : 'Perry',
 'BR' : 'Perry',
 'MH' : 'Mill Hill',
 'MS' : 'Marsh',
