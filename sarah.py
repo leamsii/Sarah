@@ -2,6 +2,9 @@
 # -*- coding: utf-8 -*-
 # Dependencies make sure to install these using pip
 
+#The URL links to the server were removed for security reasons, this project is now for educational purposes only.
+
+
 import requests
 import pyttsx3
 from colorama import Fore, Back, Style
@@ -64,24 +67,20 @@ class Remedy:
 	def __init__(self):
 
 		self.urls = {
-			"get_ticket": "https://remsmartitvp.ynhh.org:8443/ux/rest/v2/person/workitems/get",
-			"get_desc"  : "https://remsmartitvp.ynhh.org:8443/ux/rest/v2/incident/",
-			"login_url" :"https://remsmartitvp.ynhh.org:8443/ux/rest/users/sessions/"
+			"get_ticket": "",
+			"get_desc"  : "",
+			"login_url" :""
 		}
 
 		# Set payload
-		self.payload = {"filterCriteria":{"assignedSupportGroups":[{"name":"Desktop Support - BH","company":{"name":"Yale New Haven Health"},
-		"organization":"IT Support","isDefault":True,"id":"SGP000000000184"}],"statusMappings":["open"],
-		"ticketTypes":["incident"]},"chunkInfo":{"startIndex":0,"chunkSize":75},"sortInfo":{},
-		"attributeNames":["priority","id","assignee","summary","status","submitDate"],"customAttributeNames":[]}
+		self.payload = {}
 
 
 	def login(self, session):
 		username = input("Username: ").strip()
 		password = getpass.getpass().strip()
 
-		payload = {"password": password,"appName":"Galileo","appVersion":"2.0.00.000","apiVersion":1600000,"locale":"en","deviceToken":"dummyToken",
-			"os":"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36","model":"Web Client"}
+		payload = {}
 
 		# Send payload information to server
 		response = session.post(self.urls['login_url'] + username, cookies = self.session_properties, json = payload)
@@ -100,8 +99,6 @@ class Remedy:
 
 		# Set the cookies for the session
 		self.session_properties = {
-			"JSESSIONID" : data.cookies['JSESSIONID'],
-			"NSC_wtsw_sfntnbsujuwq_8443_ofx" : data.cookies['NSC_wtsw_sfntnbsujuwq_8443_ofx']
 		}
 		return session
 
